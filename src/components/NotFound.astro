@@ -1,0 +1,39 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ParticleText from './ParticleText.astro';
+import SkinIcon from './SkinIcon.astro';
+import SnakeGame from './SnakeGame.astro';
+import { pathFor, useTranslations, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+---
+
+<Layout lang={lang} title={t.notFound.title} description={t.notFound.description}>
+  {
+    /* Hosts serve the root 404.html for every miss, including English ones,
+       so send those on to the translated page. */
+    lang === 'nl' && (
+      <script is:inline>
+        {`if (location.pathname.startsWith('/en/')) location.replace('/en/404/');`}
+      </script>
+    )
+  }
+  <section class="notfound px-6">
+    <p class="section-label">{t.notFound.gameOver}</p>
+    <h1 class="notfound-code">
+      <ParticleText text="404" />
+    </h1>
+    <h2 class="notfound-heading">{t.notFound.heading}</h2>
+    <p class="notfound-message">{t.notFound.message}</p>
+    <a href={pathFor(lang)} class="btn btn-primary notfound-home">
+      <SkinIcon modern="lucide:arrow-left" pixel="pixelarticons:arrow-left" /> {t.notFound.home}
+    </a>
+
+    <p class="notfound-invite">{t.notFound.gameInvite}</p>
+    <SnakeGame lang={lang} />
+  </section>
+</Layout>

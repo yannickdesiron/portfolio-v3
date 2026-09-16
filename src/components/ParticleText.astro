@@ -1,0 +1,620 @@
+---
+interface Props {
+  text: string;
+}
+const { text } = Astro.props;
+---
+
+<span class="particle-text" data-particle-text>
+  <span class="particle-text-label accent-line">{text}</span>
+  <canvas class="particle-text-canvas" aria-hidden="true"></canvas>
+</span>
+
+<script>
+  const PAD = 44; // room around the text so pushed dots don't get clipped
+  const INTRO_MIN_TRAVEL = 320; // no dot starts nearer than this
+  const SPRING = 0.055;
+  const FRICTION = 0.86;
+  const PUSH = 2.6;
+  const INTRO_TRAVEL = 700; // how long one dot takes to reach its place
+  const INTRO_STAGGER = 360; // left-to-right offset across the line
+  const BURST_TRAVEL = 480; // the way out is quicker than the way back
+  const BURST_STAGGER = 170; // a tighter sweep, so the apex does not hang
+  const DELAY_JITTER = 0.18; // as a fraction of the sweep
+
+  /** Total time one phase needs, including the slowest dot's delay. */
+  function introSpan(out: boolean) {
+    const stagger = out ? BURST_STAGGER : INTRO_STAGGER;
+    const travel = out ? BURST_TRAVEL : INTRO_TRAVEL;
+    return stagger * (1 + DELAY_JITTER) + travel;
+  }
+  // Layout and web fonts can still settle just after load; a build inside this
+  // window (re)seeds the welcome animation so it never plays on a stale measure.
+  const INTRO_WINDOW = 1500;
+  // beyond this the canvas would cost too much memory and we trade sharpness
+  const MAX_CANVAS_PIXELS = 16_000_000;
+  let pageStart = performance.now();
+
+  type Dot = {
+    x: number;
+    y: number;
+    hx: number;
+    hy: number;
+    vx: number;
+    vy: number;
+    ix: number;
+    iy: number;
+    delay: number;
+  };
+
+  /** Aborted when the client router swaps the page away. */
+  let teardown: AbortController | null = null;
+
+  function initParticleText(el: HTMLElement) {
+    const label = el.querySelector<HTMLElement>('.particle-text-label');
+    const canvas = el.querySelector<HTMLCanvasElement>('.particle-text-canvas');
+    if (!label || !canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const signal = teardown!.signal;
+
+    const text = label.textContent ?? '';
+    const pointer = { x: -9999, y: -9999 };
+    let dots: Dot[] = [];
+    let paint: string | CanvasGradient = '#ea580c';
+    let rect = canvas.getBoundingClientRect();
+    let w = 0;
+    let h = 0;
+    let dotSize = 2;
+    let radius = 100;
+    let pad = PAD;
+    let textLeft = PAD;
+    let textWidth = 0;
+    // where the dots were sampled, so a later rebuild can move them instead of
+    // resampling on a differently aligned grid — which would shift every dot
+    let dotsOriginX = PAD;
+    let dotsOriginY = PAD;
+    let dotsBox = '';
+    let raf = 0;
+    let lastFrameAt = 0;
+    let visible = true;
+    let pixelMode = false;
+    let introDone = false;
+    let introStart = 0;
+    let introUntil = 0;
+    let introOut = false; // flying apart, before the gathering phase
+    let burstTimer = 0;
+
+    function readPaint(isPixel: boolean) {
+      const cs = getComputedStyle(document.documentElement);
+      const from = cs.getPropertyValue('--accent').trim() || '#ea580c';
+      const to = cs.getPropertyValue('--accent-grad-to').trim() || from;
+      if (isPixel) {
+        paint = from;
+        return;
+      }
+      const gradient = ctx!.createLinearGradient(textLeft, 0, Math.max(textLeft + textWidth, textLeft + 1), 0);
+      gradient.addColorStop(0, from);
+      gradient.addColorStop(1, to);
+      paint = gradient;
+    }
+
+    /**
+     * Where the browser actually broke the headline. Each entry is one visual
+     * line with its own box, so a wrapped or centred headline still samples
+     * exactly where the glyphs sit.
+     */
+    function measureLines(): { text: string; rect: DOMRect }[] {
+      const node = label!.firstChild;
+      if (!node || node.nodeType !== Node.TEXT_NODE) return [];
+      const content = node.textContent ?? '';
+      const range = document.createRange();
+      const rectOf = (from: number, to: number) => {
+        let start = from;
+        let end = to;
+        while (start < end && /\s/.test(content[start])) start += 1;
+        while (end > start && /\s/.test(content[end - 1])) end -= 1;
+        range.setStart(node, start);
+        range.setEnd(node, end);
+        return { text: content.slice(start, end), rect: range.getBoundingClientRect() };
+      };
+
+      const lines: { text: string; rect: DOMRect }[] = [];
+      let lineStart = 0;
+      let lineTop: number | null = null;
+      for (let i = 0; i < content.length; i += 1) {
+        range.setStart(node, i);
+        range.setEnd(node, i + 1);
+        const r = range.getBoundingClientRect();
+        if (!r.width && !r.height) continue; // collapsed whitespace at a break
+        if (lineTop === null) {
+          lineTop = r.top;
+        } else if (Math.abs(r.top - lineTop) > 1) {
+          lines.push(rectOf(lineStart, i));
+          lineStart = i;
+          lineTop = r.top;
+        }
+      }
+      lines.push(rectOf(lineStart, content.length));
+      return lines.filter((l) => l.text.length && l.rect.width > 0);
+    }
+
+    function build({ intro = false, wide = false, keepDots = false } = {}) {
+      const box = label!.getBoundingClientRect();
+      if (box.width < 4 || box.height < 4) return;
+
+      const isPixel = document.documentElement.dataset.style === 'pixel';
+      const cs = getComputedStyle(label!);
+      const fontSize = parseFloat(cs.fontSize) || 40;
+
+      // Welcome animation: the dots detach from the ambient background grid and
+      // fly into place, sweeping from left to right. Only right after load, so a
+      // theme switch or a later resize never replays it.
+      const playIntro =
+        intro ||
+        (!introDone &&
+          document.documentElement.dataset.intro === 'play' &&
+          performance.now() - pageStart < INTRO_WINDOW);
+      // a burst needs the same room to fly, but keeps the dots where they are
+      const wideCanvas = playIntro || wide;
+
+      // During the intro the canvas covers the viewport, so dots can fly in from
+      // anywhere on screen. Afterwards it hugs the text again, which keeps the
+      // per-frame work for the cursor effect tiny.
+      pad = PAD;
+      let originX: number;
+      let originY: number;
+      if (wideCanvas) {
+        w = Math.ceil(window.innerWidth);
+        h = Math.ceil(window.innerHeight);
+        originX = box.left;
+        originY = box.top;
+      } else {
+        w = Math.ceil(box.width) + pad * 2;
+        h = Math.ceil(box.height) + pad * 2;
+        originX = pad;
+        originY = pad;
+      }
+
+      // Full device resolution, so the flying dots are as crisp as the settled
+      // ones. The wide intro canvas only gives that up if the buffer would grow
+      // unreasonably — which normal headlines never reach.
+      const fitsBudget = Math.sqrt(MAX_CANVAS_PIXELS / Math.max(w * h, 1));
+      const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2, fitsBudget));
+      canvas!.width = Math.round(w * dpr);
+      canvas!.height = Math.round(h * dpr);
+      canvas!.style.width = `${w}px`;
+      canvas!.style.height = `${h}px`;
+      if (wideCanvas) {
+        canvas!.style.position = 'fixed';
+        canvas!.style.left = '0px';
+        canvas!.style.top = '0px';
+        // A transformed ancestor becomes the containing block for a fixed
+        // element, so the canvas does not always land on the viewport origin.
+        // Measure where it actually is and place the text relative to that.
+        const placed = canvas!.getBoundingClientRect();
+        originX = box.left - placed.left;
+        originY = box.top - placed.top;
+      } else {
+        // Anchor on the label, not on the wrapper: an inline-block wrapper does
+        // not always hug its text, which would shift every dot sideways.
+        canvas!.style.position = 'absolute';
+        canvas!.style.left = `${label!.offsetLeft - pad}px`;
+        canvas!.style.top = `${label!.offsetTop - pad}px`;
+      }
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      // Dot size stays constant; only the grid spacing scales with the type,
+      // so a bigger headline means more dots rather than bigger ones.
+      const gap = isPixel
+        ? Math.max(3.2, Math.min(7, fontSize * 0.078))
+        : Math.max(2.5, Math.min(4.2, fontSize * 0.034));
+      dotSize = isPixel ? 2.5 : 2.1;
+      radius = Math.max(70, fontSize * 1.5);
+
+      // Same text, new canvas origin: shift the dots we already have. Sampling
+      // again would land them on a differently phased grid and they would
+      // visibly jump at the end of the intro.
+      const sameText = dotsBox === `${Math.round(box.width)}x${Math.round(box.height)}`;
+      if (keepDots && dots.length && sameText) {
+        const shiftX = originX - dotsOriginX;
+        const shiftY = originY - dotsOriginY;
+        for (const dot of dots) {
+          dot.hx += shiftX;
+          dot.hy += shiftY;
+          dot.x += shiftX;
+          dot.y += shiftY;
+          dot.ix += shiftX;
+          dot.iy += shiftY;
+        }
+        dotsOriginX = originX;
+        dotsOriginY = originY;
+        pixelMode = isPixel;
+        textLeft = originX;
+        textWidth = box.width;
+        readPaint(isPixel);
+        rect = canvas!.getBoundingClientRect();
+        paintDots();
+        wake();
+        return;
+      }
+
+      // Render the text offscreen once, then sample it into a dot grid
+      const off = document.createElement('canvas');
+      off.width = canvas!.width;
+      off.height = canvas!.height;
+      const octx = off.getContext('2d', { willReadFrequently: true });
+      if (!octx) return;
+      octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      octx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      if ('letterSpacing' in octx) {
+        octx.letterSpacing = cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing;
+      }
+      octx.fillStyle = '#fff';
+      octx.textBaseline = 'alphabetic';
+
+      const lines = measureLines();
+      for (const line of lines) {
+        const metrics = octx.measureText(line.text);
+        const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.72;
+        const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
+        // position each line where the browser put it, relative to the label box
+        const x = line.rect.left - box.left + originX;
+        const baseline =
+          line.rect.top - box.top + originY + (line.rect.height - (ascent + descent)) / 2 + ascent;
+        // Corrects for engines that ignore canvas letter-spacing
+        const scaleX =
+          metrics.width > 0 ? Math.min(1.2, Math.max(0.8, line.rect.width / metrics.width)) : 1;
+        octx.save();
+        octx.translate(x, baseline);
+        octx.scale(scaleX, 1);
+        octx.fillText(line.text, 0, 0);
+        octx.restore();
+      }
+
+      const pixels = octx.getImageData(0, 0, off.width, off.height).data;
+      const step = Math.max(2, Math.round(gap * dpr));
+      const next: Dot[] = [];
+      for (let py = 0; py < off.height; py += step) {
+        for (let px = 0; px < off.width; px += step) {
+          if (pixels[(py * off.width + px) * 4 + 3] > 140) {
+            const hx = px / dpr;
+            const hy = py / dpr;
+            next.push({ x: hx, y: hy, hx, hy, vx: 0, vy: 0, ix: hx, iy: hy, delay: 0 });
+          }
+        }
+      }
+
+      pixelMode = isPixel;
+      textLeft = originX;
+      textWidth = box.width;
+
+      if (playIntro && next.length) {
+        const grid =
+          parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--grid-size')) || 26;
+        for (const dot of next) {
+          // anywhere on the screen, but never so close that it barely travels
+          let sx = Math.random() * w;
+          let sy = Math.random() * h;
+          const dx = sx - dot.hx;
+          const dy = sy - dot.hy;
+          const reach = Math.hypot(dx, dy) || 1;
+          if (reach < INTRO_MIN_TRAVEL) {
+            sx = dot.hx + (dx / reach) * INTRO_MIN_TRAVEL;
+            sy = dot.hy + (dy / reach) * INTRO_MIN_TRAVEL;
+          }
+          // snapped to the background grid, so they read as its dots breaking loose
+          dot.ix = Math.round(sx / grid) * grid;
+          dot.iy = Math.round(sy / grid) * grid;
+          dot.x = dot.ix;
+          dot.y = dot.iy;
+          // 0 at the left of the headline, 1 at the right, plus a little jitter;
+          // each phase multiplies it by its own sweep length
+          const acrossText = (dot.hx - textLeft) / Math.max(textWidth, 1);
+          dot.delay = Math.min(Math.max(acrossText, 0), 1) + Math.random() * DELAY_JITTER;
+        }
+        introDone = false;
+        introOut = false;
+        introStart = performance.now();
+        introUntil = introStart + introSpan(false);
+        // If frames stall mid-flight, drop the dots into place rather than
+        // leaving the headline scattered.
+        window.setTimeout(() => {
+          if (!introDone && performance.now() - lastFrameAt > 250) endIntro();
+        }, introSpan(false) + 400);
+      }
+
+      dots = next;
+      dotsOriginX = originX;
+      dotsOriginY = originY;
+      dotsBox = `${Math.round(box.width)}x${Math.round(box.height)}`;
+      readPaint(isPixel);
+      rect = canvas!.getBoundingClientRect();
+      // Paint immediately, also for the intro: that hands the headline over
+      // from the real text to the dots in one step, instead of showing both
+      // until the first animation frame lands.
+      paintDots();
+      wake();
+    }
+
+    let rebuildTimer = 0;
+    function rebuild(keepDots = false) {
+      window.clearTimeout(rebuildTimer);
+      rebuildTimer = window.setTimeout(() => build({ keepDots }), 120);
+    }
+
+    function paintDots() {
+      ctx!.clearRect(0, 0, w, h);
+      ctx!.fillStyle = paint;
+      for (const dot of dots) {
+        ctx!.fillRect(dot.x - dotSize / 2, dot.y - dotSize / 2, dotSize, dotSize);
+      }
+      if (dots.length) el.dataset.ready = 'true';
+    }
+
+    /**
+     * Blows the dots apart from the middle of the headline. No timeline: the
+     * spring that already pulls every dot home turns the shove into a bounce.
+     */
+    function burst() {
+      if (!dots.length) return;
+      build({ wide: true, keepDots: true }); // room to fly without clipping
+
+      const grid =
+        parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--grid-size')) || 26;
+      for (const dot of dots) {
+        // the same spread the welcome animation starts from, now as a target
+        let sx = Math.random() * w;
+        let sy = Math.random() * h;
+        const dx = sx - dot.hx;
+        const dy = sy - dot.hy;
+        const reach = Math.hypot(dx, dy) || 1;
+        if (reach < INTRO_MIN_TRAVEL) {
+          sx = dot.hx + (dx / reach) * INTRO_MIN_TRAVEL;
+          sy = dot.hy + (dy / reach) * INTRO_MIN_TRAVEL;
+        }
+        dot.ix = Math.round(sx / grid) * grid;
+        dot.iy = Math.round(sy / grid) * grid;
+        dot.x = dot.hx;
+        dot.y = dot.hy;
+        dot.vx = 0;
+        dot.vy = 0;
+      }
+
+      introOut = true;
+      introDone = false;
+      introStart = performance.now();
+      introUntil = introStart + introSpan(true);
+
+      // if frames stall (hidden tab), drop everything home and shrink back
+      window.clearTimeout(burstTimer);
+      burstTimer = window.setTimeout(
+        () => {
+          if (!introUntil && !introOut) return;
+          endIntro();
+        },
+        introSpan(true) + introSpan(false) + 600,
+      );
+      wake();
+    }
+
+    function endIntro() {
+      introDone = true;
+      if (!introUntil && !introOut) return;
+      introUntil = 0;
+      introOut = false;
+      window.clearTimeout(burstTimer);
+      for (const dot of dots) {
+        dot.x = dot.hx;
+        dot.y = dot.hy;
+        dot.vx = 0;
+        dot.vy = 0;
+      }
+      // paint straight away: if frames are stalled the headline would otherwise
+      // be left as an unreadable cloud of dots
+      paintDots();
+      rebuild(true); // back to the small canvas, keeping the dots exactly where they are
+    }
+
+    function frame() {
+      raf = 0;
+      lastFrameAt = performance.now();
+      ctx!.clearRect(0, 0, w, h);
+      ctx!.fillStyle = paint;
+
+      const now = performance.now();
+      if (now < introUntil) {
+        const stagger = introOut ? BURST_STAGGER : INTRO_STAGGER;
+        const travel = introOut ? BURST_TRAVEL : INTRO_TRAVEL;
+        for (const dot of dots) {
+          const p = Math.min(Math.max((now - introStart - dot.delay * stagger) / travel, 0), 1);
+          // pixel mode lands in hard steps, modern mode glides
+          const eased = pixelMode ? Math.ceil(p * 4) / 4 : 1 - (1 - p) ** 3;
+          // out: home → scatter point. in: scatter point → home.
+          const fromX = introOut ? dot.hx : dot.ix;
+          const fromY = introOut ? dot.hy : dot.iy;
+          const toX = introOut ? dot.ix : dot.hx;
+          const toY = introOut ? dot.iy : dot.hy;
+          dot.x = fromX + (toX - fromX) * eased;
+          dot.y = fromY + (toY - fromY) * eased;
+          ctx!.fillRect(dot.x - dotSize / 2, dot.y - dotSize / 2, dotSize, dotSize);
+        }
+        if (dots.length) el.dataset.ready = 'true';
+        if (visible && !document.hidden) raf = requestAnimationFrame(frame);
+        return;
+      }
+      // the way out is done: turn around and gather again
+      if (introOut) {
+        introOut = false;
+        introStart = now;
+        introUntil = now + introSpan(false);
+        if (visible && !document.hidden) raf = requestAnimationFrame(frame);
+        return;
+      }
+      if (introUntil) {
+        introUntil = 0;
+        introDone = true;
+        rebuild(true); // back to the small canvas, keeping the dots exactly where they are
+      }
+
+      let moving = false;
+      const r2 = radius * radius;
+
+      for (const dot of dots) {
+        const dx = dot.x - pointer.x;
+        const dy = dot.y - pointer.y;
+        const dist2 = dx * dx + dy * dy;
+        if (dist2 < r2) {
+          const dist = Math.sqrt(dist2) || 0.5;
+          const falloff = 1 - dist / radius;
+          const force = falloff * falloff * PUSH;
+          dot.vx += (dx / dist) * force;
+          dot.vy += (dy / dist) * force;
+        }
+        dot.vx = (dot.vx + (dot.hx - dot.x) * SPRING) * FRICTION;
+        dot.vy = (dot.vy + (dot.hy - dot.y) * SPRING) * FRICTION;
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+        if (!moving && (Math.abs(dot.vx) > 0.02 || Math.abs(dot.vy) > 0.02)) moving = true;
+        ctx!.fillRect(dot.x - dotSize / 2, dot.y - dotSize / 2, dotSize, dotSize);
+      }
+
+      // Only hand over from the real text once dots are actually on screen,
+      // so the headline is never invisible (hidden tab, slow paint, …)
+      if (dots.length) el.dataset.ready = 'true';
+
+      // Idle when everything has settled; a pointer move wakes it again
+      if (moving && visible && !document.hidden) {
+        raf = requestAnimationFrame(frame);
+      }
+    }
+
+    function wake() {
+      if (!visible || document.hidden) return;
+      // A handle from a frame that never fired (tab hidden, throttled) would
+      // block the loop for good, so treat a silent one as stale.
+      if (raf && performance.now() - lastFrameAt > 250) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+      if (!raf) {
+        lastFrameAt = performance.now();
+        raf = requestAnimationFrame(frame);
+      }
+    }
+
+    // A frame scheduled while the tab was hidden never fires, which would
+    // leave a stale handle and stall the loop for good.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      } else {
+        wake();
+      }
+    }, { signal });
+
+    // Always wake: dots parked at equilibrium under the cursor need a frame to
+    // spring back once it moves away, even when the new position is far off.
+    window.addEventListener(
+      'pointermove',
+      (event) => {
+        pointer.x = event.clientX - rect.left;
+        pointer.y = event.clientY - rect.top;
+        wake();
+      },
+      { passive: true, signal },
+    );
+
+    // Pointer left the window entirely: no more moves would ever arrive
+    document.addEventListener('pointerleave', () => {
+      pointer.x = -9999;
+      pointer.y = -9999;
+      wake();
+    }, { signal });
+
+    // Replayed from the button in the hero
+    document.addEventListener('particletext:replay', burst, { signal });
+
+    // Any deliberate interaction cuts the welcome animation short
+    for (const evt of ['pointerdown', 'keydown', 'wheel', 'touchstart']) {
+      window.addEventListener(
+        evt,
+        (event) => {
+          // the replay button starts an intro; its own click must not end it
+          if ((event.target as HTMLElement)?.closest?.('[data-replay-intro]')) return;
+          endIntro();
+        },
+        { passive: true, once: true, signal },
+      );
+    }
+
+    const syncRect = () => {
+      rect = canvas.getBoundingClientRect();
+    };
+    window.addEventListener('scroll', syncRect, { passive: true, signal });
+
+    const resizeObserver = new ResizeObserver(rebuild);
+    resizeObserver.observe(label);
+    const styleObserver = new MutationObserver(rebuild);
+    styleObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme', 'data-style'],
+    });
+    const viewObserver = new IntersectionObserver((entries) => {
+      visible = entries.some((entry) => entry.isIntersecting);
+      if (visible) wake();
+    });
+    viewObserver.observe(el);
+
+    signal.addEventListener('abort', () => {
+      resizeObserver.disconnect();
+      styleObserver.disconnect();
+      viewObserver.disconnect();
+      window.clearTimeout(rebuildTimer);
+      window.clearTimeout(burstTimer);
+      cancelAnimationFrame(raf);
+      raf = 0;
+      visible = false;
+    });
+
+    // document.fonts.ready can resolve before a late-discovered face even starts
+    // loading, so ask for this exact font first — otherwise the first sample is
+    // taken from the fallback and the dots land at the wrong size.
+    if (document.fonts?.load) {
+      const cs = getComputedStyle(label);
+      document.fonts
+        .load(`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`)
+        .catch(() => {})
+        .then(() => document.fonts.ready)
+        .catch(() => {})
+        .then(() => build());
+    } else {
+      build();
+    }
+  }
+
+  /** Elements already running, so a repeated page-load event cannot start a
+   *  second instance on top of a working one. */
+  const running = new WeakSet<HTMLElement>();
+
+  function initAll() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    // every page counts as freshly loaded, so a language swap gets the intro too
+    pageStart = performance.now();
+    if (!teardown || teardown.signal.aborted) teardown = new AbortController();
+    document.querySelectorAll<HTMLElement>('[data-particle-text]').forEach((el) => {
+      if (running.has(el)) return;
+      running.add(el);
+      initParticleText(el);
+    });
+  }
+
+  // fires on the first load and after every view transition
+  document.addEventListener('astro:page-load', initAll);
+  // only a real page swap tears the old instance down
+  document.addEventListener('astro:before-swap', () => {
+    teardown?.abort();
+    teardown = null;
+  });
+</script>

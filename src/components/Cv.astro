@@ -1,0 +1,82 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SkinIcon from './SkinIcon.astro';
+import { formatPeriod, pathFor, useTranslations, type Lang } from '../i18n';
+import { contact, experience } from '../data/experience';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const t = useTranslations(lang);
+---
+
+<Layout lang={lang} title={t.cv.title} description={t.cv.description}>
+  <article class="cv mx-auto max-w-3xl px-6 py-16">
+    <header class="cv-head">
+      <div>
+        <p class="section-label">{t.cv.heading}</p>
+        <h1 class="cv-name">Yannick Desiron</h1>
+        <p class="cv-role">{t.profile.role}</p>
+      </div>
+      <button type="button" id="cv-print" class="btn btn-ghost cv-print">
+        <SkinIcon modern="lucide:printer" pixel="pixelarticons:printer" />
+        {t.cv.print}
+      </button>
+    </header>
+
+    <p class="cv-intro">{t.profile.bio}</p>
+
+    <section class="cv-section">
+      <h2>{t.cv.experience}</h2>
+      <ol class="cv-list">
+        {experience.map((item) => (
+          <li class="cv-entry">
+            <p class="cv-period">{formatPeriod(lang, item.start, item.end)}</p>
+            <div>
+              <h3>{t.story.roles[item.role]}</h3>
+              <p class="cv-org">{item.org}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+
+    <section class="cv-section">
+      <h2>{t.cv.skills}</h2>
+      <ul class="cv-tags">
+        {t.skills.items.map((skill) => <li>{skill}</li>)}
+      </ul>
+    </section>
+
+    <section class="cv-section cv-grid">
+      <div>
+        <h2>{t.cv.languages}</h2>
+        <p>{t.cv.languagesValue}</p>
+      </div>
+      <div>
+        <h2>{t.cv.location}</h2>
+        <p>{t.cv.locationValue}</p>
+      </div>
+    </section>
+
+    <section class="cv-section">
+      <h2>{t.cv.contact}</h2>
+      <ul class="cv-contact">
+        <li><a href={`mailto:${contact.email}`}>{contact.email}</a></li>
+        <li><a href={contact.github} rel="noopener">{contact.github.replace(/^https?:\/\//, '')}</a></li>
+        <li><a href={contact.linkedin} rel="noopener">{contact.linkedin.replace(/^https?:\/\//, '')}</a></li>
+      </ul>
+    </section>
+
+    <p class="cv-back">
+      <a href={pathFor(lang)}>{t.cv.backToSite}</a>
+    </p>
+  </article>
+</Layout>
+
+<script>
+  document.addEventListener('astro:page-load', () => {
+    document.getElementById('cv-print')?.addEventListener('click', () => window.print());
+  });
+</script>

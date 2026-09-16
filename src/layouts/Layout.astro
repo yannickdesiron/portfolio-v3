@@ -1,0 +1,732 @@
+---
+import '../styles/global.css';
+import SkinIcon from '../components/SkinIcon.astro';
+import { Icon } from 'astro-icon/components';
+import { ClientRouter } from 'astro:transitions';
+import { languages, pathFor, useTranslations, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  title?: string;
+  description?: string;
+}
+const { lang, title, description } = Astro.props;
+const t = useTranslations(lang);
+const site = Astro.site ?? new URL('http://localhost:4321');
+
+// On a subpage the section links have to travel back to the homepage first
+const home = pathFor(lang);
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const isHome = path === (home.replace(/\/$/, '') || '/');
+const section = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
+// switching language keeps you on the same page, not just on the homepage
+const rest = path.slice(home.replace(/\/$/, '').length).replace(/^\//, '');
+const samePageIn = (code: Lang) => `${pathFor(code)}${rest}`;
+---
+
+<html lang={lang} data-style="modern" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description ?? t.meta.description} />
+    <title>{title ?? t.meta.title}</title>
+
+    {/* tells search engines the pages are translations of one another */}
+    {languages.map((l) => (
+      <link rel="alternate" hreflang={l.code} href={new URL(pathFor(l.code), site).href} />
+    ))}
+    <link rel="alternate" hreflang="x-default" href={new URL('/', site).href} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;600&family=Press+Start+2P&family=VT323&display=swap"
+      rel="stylesheet"
+    />
+
+    <ClientRouter />
+
+    <!-- Theme init before paint: no flash of wrong theme -->
+    <script is:inline>
+      (() => {
+        const root = document.documentElement;
+        try {
+          const style = localStorage.getItem('style');
+          const theme = localStorage.getItem('theme');
+          if (style) root.dataset.style = style;
+          if (theme) root.dataset.theme = theme;
+          else if (window.matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark';
+        } catch {}
+
+        // Welcome animation: first visit of the session only, and never when
+        // the visitor asked for reduced motion.
+        let intro = 'play';
+        try {
+          if (sessionStorage.getItem('intro') === '1') intro = 'skip';
+          sessionStorage.setItem('intro', '1');
+        } catch {}
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) intro = 'skip';
+        root.dataset.intro = intro;
+      })();
+
+      // A view transition swaps the document and resets these attributes,
+      // so put the visitor's skin back before the new page paints.
+      document.addEventListener('astro:after-swap', () => {
+        const root = document.documentElement;
+        try {
+          const style = localStorage.getItem('style');
+          const theme = localStorage.getItem('theme');
+          if (style) root.dataset.style = style;
+          if (theme) root.dataset.theme = theme;
+          else if (window.matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark';
+        } catch {}
+        // a language swap is a deliberate action, so let the headline rebuild
+        root.dataset.intro = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'skip'
+          : 'play';
+      });
+    </script>
+  </head>
+
+  <body>
+    <!-- Interactive dot-grid background: lights up around the cursor -->
+    <div class="bg-fx" aria-hidden="true">
+      <div class="bg-fx-dots"></div>
+      <div class="bg-fx-spot"></div>
+      <div class="bg-fx-halo"></div>
+      <div class="bg-fx-ripple"></div>
+    </div>
+
+    <header class="site-header">
+      <div class="flex w-full items-center justify-between gap-4 px-6 py-3 md:px-10">
+        <a href={isHome ? '#top' : home} class="display text-lg font-extrabold no-underline" style="color: var(--text)">
+          YD<span style="color: var(--accent)">.</span>
+        </a>
+
+        <nav class="hidden gap-6 text-sm sm:flex" style="font-family: var(--font-display)">
+          <a href={section('projects')} class="opacity-80 transition-opacity hover:opacity-100">{t.nav.projects}</a>
+          <a href={section('story')} class="opacity-80 transition-opacity hover:opacity-100">{t.nav.story}</a>
+          <a href={section('skills')} class="opacity-80 transition-opacity hover:opacity-100">{t.nav.skills}</a>
+          <a href={`${home}cv`} class="opacity-80 transition-opacity hover:opacity-100">{t.nav.cv}</a>
+          <a href={section('contact')} class="opacity-80 transition-opacity hover:opacity-100">{t.nav.contact}</a>
+        </nav>
+
+        <div class="flex items-center gap-2">
+          {
+            /* one link to the other language keeps the bar calm; search engines
+               get the full picture from the hreflang tags in the head */
+            languages
+              .filter((l) => l.code !== lang)
+              .map((l) => (
+                <a class="lang-switch" href={samePageIn(l.code)} hreflang={l.code} title={t.ui.switchTo}>
+                  {l.label}
+                </a>
+              ))
+          }
+          <button
+            id="theme-toggle"
+            class="btn btn-ghost !px-3 !py-2"
+            aria-label={t.ui.themeToggle}
+            title={t.ui.themeTitle}
+          >
+            <span class="theme-icon-light">
+              <SkinIcon modern="lucide:sun" pixel="pixelarticons:sun-alt" />
+            </span>
+            <span class="theme-icon-dark">
+              <SkinIcon modern="lucide:moon" pixel="pixelarticons:moon-stars" />
+            </span>
+          </button>
+          <button
+            id="nav-toggle"
+            class="btn btn-ghost !px-3 !py-2 sm:hidden"
+            aria-expanded="false"
+            aria-controls="mobile-nav"
+            aria-label={t.ui.menuOpen}
+            data-label-open={t.ui.menuOpen}
+            data-label-close={t.ui.menuClose}
+          >
+            <span class="nav-icon-open"><SkinIcon modern="lucide:menu" pixel="pixelarticons:menu" /></span>
+            <span class="nav-icon-close"><SkinIcon modern="lucide:x" pixel="pixelarticons:close" /></span>
+          </button>
+          <button
+            id="style-toggle"
+            class="btn btn-primary !px-3 !py-2"
+            aria-label={t.ui.styleToggle}
+            title={t.ui.insertCoin}
+            data-title-modern={t.ui.insertCoin}
+            data-title-pixel={t.ui.exitGame}
+          >
+            <span class="modern-only"><Icon name="lucide:gamepad-2" class="skin-icon" /></span>
+            <span class="pixel-only"><Icon name="pixelarticons:logout" class="skin-icon" /></span>
+          </button>
+        </div>
+      </div>
+
+      <nav id="mobile-nav" class="mobile-nav" hidden aria-label={t.ui.mainMenu}>
+        <a href={section('projects')}>{t.nav.projects}</a>
+        <a href={section('story')}>{t.nav.story}</a>
+        <a href={section('skills')}>{t.nav.skills}</a>
+        <a href={`${home}cv`}>{t.nav.cv}</a>
+        <a href={section('contact')}>{t.nav.contact}</a>
+      </nav>
+    </header>
+
+    <main id="top">
+      <slot />
+    </main>
+
+    <footer class="border-t px-6 py-10 text-center" style="border-color: var(--border)">
+      <p style="color: var(--muted)">
+        {t.ui.footer}{' '}
+        <span class="footer-hint modern-only">{t.ui.commandHint}</span>{' '}
+        <span class="pixel-only">
+          {t.ui.footerPixel} <Icon name="pixelarticons:gamepad" class="skin-icon" />
+        </span>
+      </p>
+    </footer>
+
+    <dialog id="cmdk" class="cmdk" aria-label={t.ui.commandOpen}>
+      <input
+        id="cmdk-input"
+        class="cmdk-input"
+        type="text"
+        autocomplete="off"
+        placeholder={t.ui.commandPlaceholder}
+        aria-controls="cmdk-list"
+      />
+      <ul id="cmdk-list" class="cmdk-list" role="listbox"></ul>
+      <p id="cmdk-empty" class="cmdk-empty" hidden>{t.ui.commandEmpty}</p>
+      <p class="cmdk-hint">↑↓ · ↵ · esc</p>
+      <script
+        type="application/json"
+        id="cmdk-data"
+        set:html={JSON.stringify({
+          sections: t.ui.commandSections,
+          actions: t.ui.commandActions,
+          items: [
+            { id: 'profile', label: t.ui.profile, href: section('profile'), group: 'sections' },
+            { id: 'projects', label: t.nav.projects, href: section('projects'), group: 'sections' },
+            { id: 'story', label: t.nav.story, href: section('story'), group: 'sections' },
+            { id: 'skills', label: t.nav.skills, href: section('skills'), group: 'sections' },
+            { id: 'contact', label: t.nav.contact, href: section('contact'), group: 'sections' },
+            { id: 'cv', label: t.cv.heading, href: `${home}cv`, group: 'sections' },
+            { id: 'theme', label: t.ui.commandTheme, group: 'actions' },
+            { id: 'skin', label: t.ui.commandSkin, group: 'actions' },
+            { id: 'lang', label: t.ui.commandLanguage, href: pathFor(lang === 'nl' ? 'en' : 'nl'), group: 'actions' },
+            { id: 'email', label: t.ui.commandCopyEmail, group: 'actions' },
+            { id: 'snap', label: t.ui.commandSnap, group: 'actions' },
+          ],
+          copied: t.ui.commandCopied,
+          email: 'hello@example.com',
+        })}
+      />
+    </dialog>
+
+    <div class="boot" aria-hidden="true">
+      <div class="boot-inner">
+        <div>LOADING&hellip;</div>
+        <div class="boot-bar"><span></span></div>
+        <div>PIXEL MODE</div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status">
+      <SkinIcon modern="lucide:trophy" pixel="pixelarticons:trophy" /> {t.ui.achievement}
+    </div>
+
+    <style>
+      /* theme toggle shows the icon of the mode you'd switch TO */
+      :global(:root[data-theme='light']) .theme-icon-light { display: none; }
+      :global(:root[data-theme='dark']) .theme-icon-dark { display: none; }
+    </style>
+
+    <script>
+      // With the client router the body is swapped on navigation, so every
+      // element-bound listener has to be attached again. One AbortController
+      // per page tears the previous set down and prevents duplicates.
+      let teardown: AbortController | null = null;
+
+      function setup() {
+        teardown?.abort();
+        teardown = new AbortController();
+        const { signal } = teardown;
+        const root = document.documentElement;
+
+        const persist = (key: string, value: string) => {
+          try { localStorage.setItem(key, value); } catch {}
+        };
+
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle?.addEventListener('click', () => {
+          const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+          const apply = () => {
+            root.dataset.theme = next;
+            persist('theme', next);
+          };
+
+          const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (calm || !document.startViewTransition) {
+            apply();
+            return;
+          }
+
+          // the new colours grow as a circle out of the button you pressed
+          const box = themeToggle.getBoundingClientRect();
+          const x = box.left + box.width / 2;
+          const y = box.top + box.height / 2;
+          const reach = Math.hypot(
+            Math.max(x, window.innerWidth - x),
+            Math.max(y, window.innerHeight - y),
+          );
+
+          root.classList.add('theme-wipe');
+          const transition = document.startViewTransition(apply);
+          transition.ready
+            .then(() => {
+              root.animate(
+                { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${reach}px at ${x}px ${y}px)`] },
+                {
+                  duration: 520,
+                  easing: 'cubic-bezier(0.25, 0.7, 0.3, 1)',
+                  pseudoElement: '::view-transition-new(root)',
+                },
+              );
+            })
+            .catch(() => {});
+          transition.finished.finally(() => root.classList.remove('theme-wipe'));
+        }, { signal });
+
+        const styleToggle = document.getElementById('style-toggle');
+        const syncStyleTitle = () => {
+          if (!styleToggle) return;
+          const key = root.dataset.style === 'pixel' ? 'titlePixel' : 'titleModern';
+          const label = styleToggle.dataset[key];
+          if (label) styleToggle.setAttribute('title', label);
+        };
+        syncStyleTitle();
+
+        styleToggle?.addEventListener('click', () => {
+          const next = root.dataset.style === 'pixel' ? 'modern' : 'pixel';
+          const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          const swap = () => {
+            root.dataset.style = next;
+            persist('style', next);
+            syncStyleTitle();
+          };
+
+          // entering the arcade gets a short boot screen; leaving stays instant
+          if (next === 'pixel' && !calm) {
+            root.classList.add('booting');
+            setTimeout(swap, 430);
+            setTimeout(() => root.classList.remove('booting'), 900);
+            return;
+          }
+
+          root.classList.add('switching');
+          setTimeout(swap, 150);
+          setTimeout(() => root.classList.remove('switching'), 400);
+        }, { signal });
+
+        // Mobile navigation
+        const navToggle = document.getElementById('nav-toggle');
+        const mobileNav = document.getElementById('mobile-nav');
+        const setNav = (open: boolean) => {
+          if (!navToggle || !mobileNav) return;
+          mobileNav.hidden = !open;
+          navToggle.setAttribute('aria-expanded', String(open));
+          const label = open ? navToggle.dataset.labelClose : navToggle.dataset.labelOpen;
+          if (label) navToggle.setAttribute('aria-label', label);
+          navToggle.classList.toggle('is-open', open);
+        };
+
+        navToggle?.addEventListener('click', () => setNav(mobileNav?.hidden ?? true), { signal });
+        mobileNav?.addEventListener('click', (event) => {
+          if ((event.target as HTMLElement).closest('a')) setNav(false);
+        }, { signal });
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && mobileNav && !mobileNav.hidden) {
+            setNav(false);
+            navToggle?.focus();
+          }
+        }, { signal });
+        // the panel is mobile-only, so a wider viewport must not leave it stuck open
+        window.matchMedia('(min-width: 640px)').addEventListener('change', (event) => {
+          if (event.matches) setNav(false);
+        }, { signal });
+
+        // Cursor-follow for the dot-grid background (fine pointers only)
+        const fx = document.querySelector<HTMLElement>('.bg-fx');
+        if (fx && window.matchMedia('(pointer: fine)').matches) {
+          fx.classList.add('is-live');
+          let px = 0;
+          let py = 0;
+          let frame = 0;
+          window.addEventListener('pointermove', (event) => {
+            px = event.clientX;
+            py = event.clientY;
+            if (frame) return;
+            frame = requestAnimationFrame(() => {
+              fx.style.setProperty('--mx', `${px}px`);
+              fx.style.setProperty('--my', `${py}px`);
+              frame = 0;
+            });
+          }, { passive: true, signal });
+        }
+
+        // Welcome ripple: one pulse of accent dots rolling out from the hero
+        if (fx && root.dataset.intro === 'play') {
+          fx.classList.add('is-ripple');
+          const reach = Math.hypot(window.innerWidth, window.innerHeight) * 1.15;
+          const duration = 1100;
+          const start = performance.now();
+          const step = (now: number) => {
+            if (signal.aborted) return;
+            const p = Math.min((now - start) / duration, 1);
+            const eased = 1 - (1 - p) * (1 - p);
+            fx.style.setProperty('--ripple', `${eased * reach}px`);
+            fx.style.setProperty('--ripple-a', String(1 - p));
+            if (p < 1) requestAnimationFrame(step);
+            else fx.classList.remove('is-ripple');
+          };
+          requestAnimationFrame(step);
+        }
+
+        // Scroll reveals
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+              }
+            }
+          },
+          { threshold: 0.15 },
+        );
+        document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+
+        // The timeline draws itself as you scroll past it
+        const timeline = document.querySelector<HTMLElement>('.timeline');
+        if (timeline && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          const drawTimeline = () => {
+            const box = timeline.getBoundingClientRect();
+            // the line follows a point three quarters down the viewport
+            const anchor = window.innerHeight * 0.75;
+            const progress = (anchor - box.top) / box.height;
+            timeline.style.setProperty('--tl-draw', String(Math.min(Math.max(progress, 0), 1)));
+          };
+          window.addEventListener('scroll', drawTimeline, { passive: true, signal });
+          window.addEventListener('resize', drawTimeline, { signal });
+          drawTimeline();
+        }
+
+        // The snap: half of every letter on screen turns to dust, then returns
+        type SplitEntry = { original: Text; inserted: Node[] };
+        let splits: SplitEntry[] = [];
+        let dusted: HTMLElement[] = [];
+        let snapTimer = 0;
+
+        const TEXT_PARTS =
+          'main h2, main h3, main p, main li, main dt, main dd, main .chip, .section-label,' +
+          ' main .btn, .site-header nav a, .lang-switch, footer p, .marquee-item, .hero-lead';
+        const WHOLE_BLOCKS = 'main figure, main .skill-track';
+
+        /** Wraps every character in its own inline-block, words kept unbreakable. */
+        function splitIntoCharacters(host: HTMLElement) {
+          const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+          const texts: Text[] = [];
+          let node = walker.nextNode();
+          while (node) {
+            if (node.textContent?.trim()) texts.push(node as Text);
+            node = walker.nextNode();
+          }
+
+          for (const textNode of texts) {
+            const fragment = document.createDocumentFragment();
+            const inserted: Node[] = [];
+            for (const part of (textNode.textContent ?? '').split(/(\s+)/)) {
+              if (!part) continue;
+              if (/^\s+$/.test(part)) {
+                const space = document.createTextNode(part);
+                fragment.appendChild(space);
+                inserted.push(space);
+                continue;
+              }
+              const word = document.createElement('span');
+              word.className = 'snap-word';
+              for (const character of part) {
+                const span = document.createElement('span');
+                span.className = 'snap-char';
+                span.textContent = character;
+                word.appendChild(span);
+              }
+              fragment.appendChild(word);
+              inserted.push(word);
+            }
+            textNode.parentNode?.replaceChild(fragment, textNode);
+            splits.push({ original: textNode, inserted });
+          }
+        }
+
+        /** Puts the original text nodes back, so the DOM is left as it was. */
+        function unsplit() {
+          for (const entry of splits) {
+            const first = entry.inserted[0];
+            if (!first?.parentNode) continue;
+            first.parentNode.insertBefore(entry.original, first);
+            entry.inserted.forEach((n) => (n as ChildNode).remove());
+          }
+          splits = [];
+        }
+
+        const clearDust = (el: HTMLElement) => {
+          el.classList.remove('snap-dust', 'is-going', 'is-back');
+          el.style.removeProperty('--snap-delay');
+        };
+
+        const restore = () => {
+          window.clearTimeout(snapTimer);
+          const going = dusted;
+          dusted = [];
+          going.forEach((el, i) => {
+            el.classList.remove('is-going');
+            el.style.setProperty('--snap-delay', `${(i % 9) * 35}ms`);
+            el.classList.add('is-back');
+          });
+          // animationend never fires while the tab is hidden, and a half-restored
+          // element would stay invisible, so sweep up unconditionally
+          window.setTimeout(() => {
+            going.forEach(clearDust);
+            unsplit();
+          }, 1400);
+        };
+
+        const onScreen = (el: Element) => {
+          const box = el.getBoundingClientRect();
+          return box.bottom > -80 && box.top < window.innerHeight + 80 && box.width > 0;
+        };
+
+        const snap = () => {
+          if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          if (dusted.length) return restore(); // a second snap brings them back
+
+          // only what the visitor can actually see, so a long page stays quick
+          document.querySelectorAll<HTMLElement>(TEXT_PARTS).forEach((host) => {
+            if (onScreen(host)) splitIntoCharacters(host);
+          });
+
+          const characters = [...document.querySelectorAll<HTMLElement>('.snap-char')];
+          const blocks = [...document.querySelectorAll<HTMLElement>(WHOLE_BLOCKS)].filter(onScreen);
+          const victims = [...characters, ...blocks].filter(() => Math.random() < 0.5);
+
+          const centre = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+          const reach = Math.hypot(centre.x, centre.y) || 1;
+
+          victims.forEach((el) => {
+            const box = el.getBoundingClientRect();
+            const distance = Math.hypot(
+              box.left + box.width / 2 - centre.x,
+              box.top + box.height / 2 - centre.y,
+            );
+            // the dust ripples outward from the middle of the screen
+            el.style.setProperty('--snap-delay', `${Math.round((distance / reach) * 500)}ms`);
+            if (el.classList.contains('snap-char')) {
+              // every letter drifts off on its own heading
+              const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
+              const travel = 30 + Math.random() * 45;
+              el.style.setProperty('--dx', `${Math.round(Math.cos(angle) * travel)}px`);
+              el.style.setProperty('--dy', `${Math.round(Math.sin(angle) * travel)}px`);
+              el.style.setProperty('--rot', `${Math.round((Math.random() - 0.5) * 70)}deg`);
+              el.classList.add('is-going');
+            } else {
+              el.classList.add('snap-dust', 'is-going');
+            }
+          });
+
+          dusted = victims;
+          snapTimer = window.setTimeout(restore, 4200);
+        };
+
+        // Replay the headline animation
+        document.querySelectorAll('[data-replay-intro]').forEach((button) => {
+          button.addEventListener('click', () => {
+            document.dispatchEvent(new CustomEvent('particletext:replay'));
+          }, { signal });
+        });
+
+        // Cards light up under the cursor
+        document.querySelectorAll<HTMLElement>('.card-hover').forEach((card) => {
+          card.addEventListener('pointermove', (event) => {
+            const box = card.getBoundingClientRect();
+            card.style.setProperty('--px', `${event.clientX - box.left}px`);
+            card.style.setProperty('--py', `${event.clientY - box.top}px`);
+          }, { passive: true, signal });
+        });
+
+        // Mark the section you are looking at in both menus
+        const sections = [...document.querySelectorAll<HTMLElement>('main section[id]')];
+        if (sections.length) {
+          const markActive = (id: string) => {
+            document.querySelectorAll('.site-header a[href^="#"]').forEach((link) => {
+              const matches = link.getAttribute('href') === `#${id}`;
+              if (matches) link.setAttribute('aria-current', 'section');
+              else link.removeAttribute('aria-current');
+            });
+          };
+          // the band across the middle of the screen decides what counts as "here"
+          const spy = new IntersectionObserver(
+            (entries) => {
+              const hit = entries.find((entry) => entry.isIntersecting);
+              if (hit) markActive(hit.target.id);
+            },
+            { rootMargin: '-45% 0px -50% 0px' },
+          );
+          sections.forEach((section) => spy.observe(section));
+          signal.addEventListener('abort', () => spy.disconnect());
+        }
+
+        // Command palette (⌘K / Ctrl+K)
+        const dialog = document.getElementById('cmdk') as HTMLDialogElement | null;
+        const input = document.getElementById('cmdk-input') as HTMLInputElement | null;
+        const list = document.getElementById('cmdk-list');
+        const empty = document.getElementById('cmdk-empty');
+        const dataNode = document.getElementById('cmdk-data');
+
+        if (dialog && input && list && empty && dataNode) {
+          type Item = { id: string; label: string; href?: string; group: 'sections' | 'actions' };
+          const data = JSON.parse(dataNode.textContent ?? '{}') as {
+            sections: string;
+            actions: string;
+            items: Item[];
+            copied: string;
+            email: string;
+          };
+          let active = 0;
+          let shown: Item[] = [];
+
+          const run = (item: Item) => {
+            dialog.close();
+            if (item.id === 'theme') return themeToggle?.click();
+            if (item.id === 'skin') return styleToggle?.click();
+            if (item.id === 'snap') return snap();
+            if (item.id === 'email') {
+              navigator.clipboard?.writeText(data.email).then(() => {
+                const toastEl = document.getElementById('toast');
+                if (!toastEl) return;
+                const original = toastEl.textContent;
+                toastEl.textContent = data.copied;
+                toastEl.classList.add('show');
+                setTimeout(() => {
+                  toastEl.classList.remove('show');
+                  toastEl.textContent = original;
+                }, 2200);
+              });
+              return;
+            }
+            if (!item.href) return;
+            const [path, hash] = item.href.split('#');
+            const here = window.location.pathname.replace(/\/$/, '');
+            if (hash && (!path || path.replace(/\/$/, '') === here)) {
+              document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
+              return;
+            }
+            window.location.href = item.href;
+          };
+
+          const render = () => {
+            const query = input.value.trim().toLowerCase();
+            shown = data.items.filter((item) => item.label.toLowerCase().includes(query));
+            active = 0;
+            list.innerHTML = '';
+            let group = '';
+            shown.forEach((item, index) => {
+              if (item.group !== group) {
+                group = item.group;
+                const heading = document.createElement('li');
+                heading.className = 'cmdk-group';
+                heading.setAttribute('role', 'presentation');
+                heading.textContent = group === 'sections' ? data.sections : data.actions;
+                list.appendChild(heading);
+              }
+              const option = document.createElement('li');
+              option.className = 'cmdk-item';
+              option.setAttribute('role', 'option');
+              option.dataset.index = String(index);
+              option.textContent = item.label;
+              option.addEventListener('click', () => run(item));
+              list.appendChild(option);
+            });
+            empty.hidden = shown.length > 0;
+            highlight();
+          };
+
+          const highlight = () => {
+            list.querySelectorAll<HTMLElement>('.cmdk-item').forEach((option) => {
+              const isActive = Number(option.dataset.index) === active;
+              option.setAttribute('aria-selected', String(isActive));
+              if (isActive) option.scrollIntoView({ block: 'nearest' });
+            });
+          };
+
+          const open = () => {
+            input.value = '';
+            render();
+            dialog.showModal();
+            input.focus();
+          };
+
+          document.querySelectorAll('[data-cmdk-open]').forEach((el) => {
+            el.addEventListener('click', open, { signal });
+          });
+          document.addEventListener('keydown', (event) => {
+            if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+              event.preventDefault();
+              if (dialog.open) dialog.close();
+              else open();
+            }
+          }, { signal });
+
+          input.addEventListener('input', render, { signal });
+          input.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault();
+              if (!shown.length) return;
+              active = (active + (event.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length;
+              highlight();
+            } else if (event.key === 'Enter') {
+              event.preventDefault();
+              if (shown[active]) run(shown[active]);
+            }
+          }, { signal });
+
+          // clicking the backdrop closes it
+          dialog.addEventListener('click', (event) => {
+            if (event.target === dialog) dialog.close();
+          }, { signal });
+        }
+
+        // Achievement toast when the footer is reached (once)
+        const footer = document.querySelector('footer');
+        const toast = document.getElementById('toast');
+        const footerObserver = new IntersectionObserver((entries) => {
+          if (entries.some((e) => e.isIntersecting) && toast) {
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+            footerObserver.disconnect();
+          }
+        });
+        if (footer && toast) footerObserver.observe(footer);
+
+        signal.addEventListener('abort', () => {
+          observer.disconnect();
+          footerObserver.disconnect();
+        });
+      }
+
+      // fires on the first load and after every view transition
+      document.addEventListener('astro:page-load', setup);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+---
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+  /** Iconify name for modern mode, e.g. "lucide:sun" */
+  modern: string;
+  /** Iconify name for pixel mode, e.g. "pixelarticons:sun-alt" */
+  pixel: string;
+  class?: string;
+}
+const { modern, pixel, class: className = '' } = Astro.props;
+---
+
+<Icon name={modern} class:list={['skin-icon', 'modern-only', className]} aria-hidden="true" />
+<Icon name={pixel} class:list={['skin-icon', 'pixel-only', className]} aria-hidden="true" />
