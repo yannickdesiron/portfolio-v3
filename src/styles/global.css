@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Fonts worden zelf gehost (@fontsource) in plaats van via Google Fonts:
+   geen renderblokkerend verzoek naar een derde partij, geen IP-adres van de
+   bezoeker naar buiten. Elk bestand draagt zijn eigen unicode-range, dus de
+   browser haalt alleen de subset die de pagina echt nodig heeft. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/space-grotesk/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+@import "@fontsource/press-start-2p/400.css";
+@import "@fontsource/vt323/400.css";
+
 /* ==========================================================================
    Theme architecture — two axes on <html>:
      data-style = "modern" | "pixel"
@@ -28,9 +38,9 @@
   --court: #be123c;
   --dot: rgb(28 25 23 / 0.16);
   --grid-size: 26px;
-  --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --font-body: "Inter Variable", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
   --border-w: 1px;
   --dribble: cubic-bezier(0.22, 1.4, 0.36, 1);
   --ease: cubic-bezier(0.25, 0.7, 0.3, 1);
