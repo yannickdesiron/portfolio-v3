@@ -10,6 +10,33 @@ export interface Position {
   org: string;
 }
 
+/**
+ * Zes opeenvolgende "profbasketballer"-regels lezen als een opsomming, niet
+ * als een verhaal. Deze samenvatting wordt gedeeld door de tijdlijn op de
+ * homepage en het cv, zodat beide hetzelfde vertellen.
+ */
+export type TimelineEntry =
+  | { group: false; item: Position }
+  | { group: true; kind: Position['kind']; start: string; end: string | null; role: RoleKey; orgs: string[] };
+
+export function groupExperience(items: Position[], role: RoleKey = 'proPlayer'): TimelineEntry[] {
+  const out: TimelineEntry[] = [];
+  for (const item of items) {
+    const last = out.at(-1);
+    if (item.role !== role) {
+      out.push({ group: false, item });
+    } else if (last?.group && last.role === role) {
+      // de lijst loopt van nieuw naar oud, dus het begin schuift naar achteren
+      last.start = item.start;
+      // dezelfde club kan twee periodes beslaan; dubbel vermelden leest als fout
+      if (!last.orgs.includes(item.org)) last.orgs.push(item.org);
+    } else {
+      out.push({ group: true, kind: item.kind, start: item.start, end: item.end, role, orgs: [item.org] });
+    }
+  }
+  return out;
+}
+
 export const experience: Position[] = [
   { kind: 'code', start: '2026-02', end: null, role: 'itOfficer', org: 'CrediBill' },
   { kind: 'court', start: '2025-08', end: null, role: 'player', org: 'Kontich Wolves' },

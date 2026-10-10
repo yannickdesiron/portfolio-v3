@@ -10,8 +10,15 @@ interface Props {
   lang: Lang;
   title?: string;
   description?: string;
+  /**
+   * Documentmodus. Het cv is het stuk waarmee iemand solliciteert; daar horen
+   * de spelknop en de "achievement unlocked"-melding niet thuis. De
+   * stijlwissel blijft bereikbaar via het commandopalet, zodat wie in de
+   * pixel-skin zit niet vastzit.
+   */
+  plain?: boolean;
 }
-const { lang, title, description } = Astro.props;
+const { lang, title, description, plain = false } = Astro.props;
 const t = useTranslations(lang);
 const site = Astro.site ?? new URL('http://localhost:4321');
 
@@ -120,7 +127,7 @@ const person = Astro.site && {
     </script>
   </head>
 
-  <body>
+  <body data-plain={plain ? "true" : undefined}>
     <!-- Interactive dot-grid background: lights up around the cursor -->
     <div class="bg-fx" aria-hidden="true">
       <div class="bg-fx-dots"></div>
@@ -180,6 +187,7 @@ const person = Astro.site && {
             <span class="nav-icon-open"><SkinIcon modern="lucide:menu" pixel="pixelarticons:menu" /></span>
             <span class="nav-icon-close"><SkinIcon modern="lucide:x" pixel="pixelarticons:close" /></span>
           </button>
+          {!plain && (
           <button
             id="style-toggle"
             class="btn btn-primary !px-3 !py-2"
@@ -191,6 +199,7 @@ const person = Astro.site && {
             <span class="modern-only"><Icon name="lucide:gamepad-2" class="skin-icon" /></span>
             <span class="pixel-only"><Icon name="pixelarticons:logout" class="skin-icon" /></span>
           </button>
+          )}
         </div>
       </div>
 
@@ -737,8 +746,9 @@ const person = Astro.site && {
           }, { signal });
         }
 
-        // Achievement toast when the footer is reached (once)
-        const footer = document.querySelector('footer');
+        // Achievement toast when the footer is reached (once) — not in
+        // document mode, where it would land on top of a CV
+        const footer = document.body.dataset.plain ? null : document.querySelector('footer');
         const toast = document.getElementById('toast');
         const footerObserver = new IntersectionObserver((entries) => {
           if (entries.some((e) => e.isIntersecting) && toast) {

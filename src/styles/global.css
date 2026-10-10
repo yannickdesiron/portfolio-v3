@@ -656,15 +656,36 @@ img {
 :root[data-style="pixel"] .cv-tags li {
   border-radius: 0;
 }
-.cv-grid {
+/* Twee kolommen: ervaring draagt het document, de rest staat ernaast.
+   Op papier scheelt dat bijna een halve pagina. */
+.cv-layout {
   display: grid;
-  gap: 2rem;
+  gap: 0 3.5rem;
 }
-@media (min-width: 640px) {
-  .cv-grid { grid-template-columns: 1fr 1fr; }
+@media (min-width: 820px) {
+  .cv-layout {
+    grid-template-columns: minmax(0, 1fr) 15rem;
+    align-items: start;
+  }
 }
-.cv-grid h2 { margin-bottom: 0.5rem; }
-.cv-grid p { margin: 0; }
+.cv-aside .cv-section:first-child {
+  margin-top: 3rem;
+}
+.cv-aside .cv-tags {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+/* Woonplaats en talen horen bij de kop, niet in een eigen sectie van één woord */
+.cv-meta {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
 .cv-back {
   margin-top: 3.5rem;
 }
@@ -701,6 +722,27 @@ img {
   }
   .cv-tags li { border-color: #bbb !important; }
   a { color: #000 !important; text-decoration: underline; }
+  /* Een onderstreept woord zonder adres is op papier niets waard. */
+  .cv-contact a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    text-decoration: none;
+    font-size: 0.9em;
+    word-break: break-all;
+  }
+  .cv-contact a[href^="mailto:"]::after {
+    content: "";
+  }
+  /* De zijkolom mag op papier onder de ervaring vallen als het krap wordt */
+  .cv-layout {
+    display: block;
+  }
+  .cv-aside {
+    margin-top: 1.6rem;
+    break-inside: avoid;
+  }
+  .cv-aside .cv-tags {
+    flex-direction: row;
+  }
   @page { margin: 16mm; }
 }
 

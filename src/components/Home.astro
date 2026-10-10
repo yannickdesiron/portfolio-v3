@@ -6,7 +6,7 @@ import { Image } from 'astro:assets';
 import profilePhoto from '../assets/profile.jpg';
 import courtPhoto from '../assets/court.jpg';
 import { formatPeriod, pathFor, useTranslations, type Lang } from '../i18n';
-import { experience } from '../data/experience';
+import { experience, groupExperience } from '../data/experience';
 
 interface Props {
   lang: Lang;
@@ -24,36 +24,12 @@ const projects = t.projects.items.map((item, i) => ({
   ][i],
 }));
 
+const timeline = groupExperience(experience);
+
 const skills = t.skills.items.map((name, i) => ({
   name,
   level: [92, 85, 88, 75, 80][i],
 }));
-
-/**
- * Zes opeenvolgende "profbasketballer"-regels onder elkaar lezen als een
- * opsomming, niet als een verhaal. Die worden één item met de clubs erin;
- * de volledige lijst blijft staan op het cv.
- */
-type TimelineEntry =
-  | { group: false; item: (typeof experience)[number] }
-  | { group: true; start: string; end: string | null; role: (typeof experience)[number]['role']; orgs: string[] };
-
-const timeline: TimelineEntry[] = [];
-for (const item of experience) {
-  const last = timeline.at(-1);
-  const mergeable = item.role === 'proPlayer';
-  if (mergeable && last?.group && last.role === 'proPlayer') {
-    // de lijst loopt van nieuw naar oud, dus het begin schuift naar achteren
-    last.start = item.start;
-    // Hubo Limburg United staat er twee keer in (twee periodes); in een
-    // samengevatte lijst leest een dubbele club als een fout.
-    if (!last.orgs.includes(item.org)) last.orgs.push(item.org);
-  } else if (mergeable) {
-    timeline.push({ group: true, start: item.start, end: item.end, role: item.role, orgs: [item.org] });
-  } else {
-    timeline.push({ group: false, item });
-  }
-}
 
 const marqueeTechs = [
   'PHP',
