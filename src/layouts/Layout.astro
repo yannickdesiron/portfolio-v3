@@ -4,6 +4,7 @@ import SkinIcon from '../components/SkinIcon.astro';
 import { Icon } from 'astro-icon/components';
 import { ClientRouter } from 'astro:transitions';
 import { languages, pathFor, useTranslations, type Lang } from '../i18n';
+import { contact } from '../data/experience';
 
 interface Props {
   lang: Lang;
@@ -22,6 +23,35 @@ const section = (id: string) => (isHome ? `#${id}` : `${home}#${id}`);
 // switching language keeps you on the same page, not just on the homepage
 const rest = path.slice(home.replace(/\/$/, '').length).replace(/^\//, '');
 const samePageIn = (code: Lang) => `${pathFor(code)}${rest}`;
+
+/**
+ * Gestructureerde data, zodat een zoekmachine de site, GitHub en LinkedIn
+ * als één persoon leest in plaats van als drie losse pagina's.
+ *
+ * Twee bewuste voorwaarden. De hele blok verschijnt pas zodra `site` in
+ * astro.config.mjs staat: zonder domein zou er localhost in de uitvoer
+ * belanden, en dat is slechter dan niets. En sameAs laat alleen echte
+ * profiel-URL's door — de placeholders in experience.ts wijzen naar de
+ * homepages van GitHub en LinkedIn, wat nergens naar verwijst.
+ */
+const isProfileUrl = (url: string) => {
+  try {
+    return new URL(url).pathname.replace(/\/+$/, '').length > 0;
+  } catch {
+    return false;
+  }
+};
+const sameAs = [contact.github, contact.linkedin].filter(isProfileUrl);
+const person = Astro.site && {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Yannick Desiron',
+  jobTitle: 'Full-stack developer',
+  url: new URL(pathFor(lang), site).href,
+  ...(sameAs.length ? { sameAs } : {}),
+  knowsLanguage: languages.map((l) => l.locale),
+  address: { '@type': 'PostalAddress', addressCountry: 'BE' },
+};
 ---
 
 <html lang={lang} data-style="modern" data-theme="light">
@@ -44,6 +74,7 @@ const samePageIn = (code: Lang) => `${pathFor(code)}${rest}`;
       <link rel="alternate" hreflang={l.code} href={new URL(pathFor(l.code), site).href} />
     ))}
     <link rel="alternate" hreflang="x-default" href={new URL('/', site).href} />
+    {person && <script type="application/ld+json" set:html={JSON.stringify(person)} />}
 
     <ClientRouter />
 
@@ -205,8 +236,8 @@ const samePageIn = (code: Lang) => `${pathFor(code)}${rest}`;
           sections: t.ui.commandSections,
           actions: t.ui.commandActions,
           items: [
-            { id: 'profile', label: t.ui.profile, href: section('profile'), group: 'sections' },
             { id: 'projects', label: t.nav.projects, href: section('projects'), group: 'sections' },
+            { id: 'profile', label: t.ui.profile, href: section('profile'), group: 'sections' },
             { id: 'story', label: t.nav.story, href: section('story'), group: 'sections' },
             { id: 'skills', label: t.nav.skills, href: section('skills'), group: 'sections' },
             { id: 'contact', label: t.nav.contact, href: section('contact'), group: 'sections' },

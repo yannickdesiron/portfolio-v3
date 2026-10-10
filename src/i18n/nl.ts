@@ -50,7 +50,7 @@ export const nl: Dict = {
     ctaContact: 'Neem contact op',
   },
   profile: {
-    label: '01 · Profiel',
+    label: '02 · Profiel',
     photoAlt: 'Yannick Desiron, zittend met een basketbal op zijn vinger',
     role: 'IT & Business Development Officer bij CrediBill',
     bio: 'Ik werk full-stack aan een facturatie- en incassoplatform: legacy-modernisering, API-koppelingen en de migratie naar een moderne stack. Daarvoor speelde ik veertien jaar profbasketbal — dat leverde de discipline op om elke dag iets beter te worden, en het geduld om aan iets te bouwen dat pas na een heel seizoen af is.',
@@ -68,7 +68,7 @@ export const nl: Dict = {
     },
   },
   projects: {
-    label: '02 · Projecten',
+    label: '01 · Projecten',
     headingModern: 'Uitgelicht werk',
     headingPixel: 'Select level',
     featured: 'Uitgelicht',

@@ -50,7 +50,7 @@ export const en: Dict = {
     ctaContact: 'Get in touch',
   },
   profile: {
-    label: '01 · Profile',
+    label: '02 · Profile',
     photoAlt: 'Yannick Desiron, seated, spinning a basketball on his finger',
     role: 'IT & Business Development Officer at CrediBill',
     bio: 'I work full-stack on an invoicing and debt collection platform: modernising legacy code, building API integrations and migrating to a modern stack. Before that I played professional basketball for fourteen years — which taught me the discipline to get a little better every day, and the patience to build something that only comes together over a full season.',
@@ -68,7 +68,7 @@ export const en: Dict = {
     },
   },
   projects: {
-    label: '02 · Projects',
+    label: '01 · Projects',
     headingModern: 'Selected work',
     headingPixel: 'Select level',
     featured: 'Featured',

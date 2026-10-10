@@ -29,6 +29,32 @@ const skills = t.skills.items.map((name, i) => ({
   level: [92, 85, 88, 75, 80][i],
 }));
 
+/**
+ * Zes opeenvolgende "profbasketballer"-regels onder elkaar lezen als een
+ * opsomming, niet als een verhaal. Die worden één item met de clubs erin;
+ * de volledige lijst blijft staan op het cv.
+ */
+type TimelineEntry =
+  | { group: false; item: (typeof experience)[number] }
+  | { group: true; start: string; end: string | null; role: (typeof experience)[number]['role']; orgs: string[] };
+
+const timeline: TimelineEntry[] = [];
+for (const item of experience) {
+  const last = timeline.at(-1);
+  const mergeable = item.role === 'proPlayer';
+  if (mergeable && last?.group && last.role === 'proPlayer') {
+    // de lijst loopt van nieuw naar oud, dus het begin schuift naar achteren
+    last.start = item.start;
+    // Hubo Limburg United staat er twee keer in (twee periodes); in een
+    // samengevatte lijst leest een dubbele club als een fout.
+    if (!last.orgs.includes(item.org)) last.orgs.push(item.org);
+  } else if (mergeable) {
+    timeline.push({ group: true, start: item.start, end: item.end, role: item.role, orgs: [item.org] });
+  } else {
+    timeline.push({ group: false, item });
+  }
+}
+
 const marqueeTechs = [
   'PHP',
   'TypeScript',
@@ -75,61 +101,6 @@ const marqueeTechs = [
       {[...marqueeTechs, ...marqueeTechs].map((tech) => <span class="marquee-item">{tech}</span>)}
     </div>
   </div>
-
-  <!-- ================= PROFILE ================= -->
-  <section id="profile" class="mx-auto max-w-5xl px-6 py-24">
-    <p class="section-label reveal">{t.profile.label}</p>
-    <div class="profile mt-8">
-      <figure class="profile-photo reveal">
-        <Image
-          class="modern-only"
-          src={profilePhoto}
-          alt={t.profile.photoAlt}
-          widths={[340, 680, 1020]}
-          sizes="(min-width: 768px) 340px, 100vw"
-        />
-        <!-- Genuinely downscaled, then blown back up by CSS: real pixel art -->
-        <Image class="pixel-only" src={profilePhoto} alt="" width={104} densities={[1]} />
-      </figure>
-
-      <div class="reveal">
-        <h2 class="text-3xl font-bold">Yannick Desiron</h2>
-        <p class="mt-2 text-lg" style="color: var(--muted)">
-          {t.profile.role}
-        </p>
-        <p class="mt-6 max-w-xl leading-relaxed" style="color: var(--muted)">
-          {t.profile.bio}
-        </p>
-
-        <dl class="profile-facts mt-10">
-          <div>
-            <dt>{t.profile.facts.role}</dt>
-            <dd>{t.profile.facts.roleValue}</dd>
-          </div>
-          <div>
-            <dt>{t.profile.facts.company}</dt>
-            <dd>CrediBill</dd>
-          </div>
-          <div>
-            <dt>{t.profile.facts.location}</dt>
-            <dd>{t.profile.facts.locationValue}</dd>
-          </div>
-          <div>
-            <dt>{t.profile.facts.stack}</dt>
-            <dd>PHP · TypeScript · MySQL</dd>
-          </div>
-          <div>
-            <dt>{t.profile.facts.background}</dt>
-            <dd>{t.profile.facts.backgroundValue}</dd>
-          </div>
-          <div>
-            <dt>{t.profile.facts.status}</dt>
-            <dd style="color: var(--accent)">{t.profile.facts.statusValue}</dd>
-          </div>
-        </dl>
-      </div>
-    </div>
-  </section>
 
   <!-- ================= PROJECTS ================= -->
   <section id="projects" class="mx-auto max-w-5xl px-6 py-20">
@@ -187,6 +158,61 @@ const marqueeTechs = [
     </div>
   </section>
 
+  <!-- ================= PROFILE ================= -->
+  <section id="profile" class="mx-auto max-w-5xl px-6 py-24">
+    <p class="section-label reveal">{t.profile.label}</p>
+    <div class="profile mt-8">
+      <figure class="profile-photo reveal">
+        <Image
+          class="modern-only"
+          src={profilePhoto}
+          alt={t.profile.photoAlt}
+          widths={[340, 680, 1020]}
+          sizes="(min-width: 768px) 340px, 100vw"
+        />
+        <!-- Genuinely downscaled, then blown back up by CSS: real pixel art -->
+        <Image class="pixel-only" src={profilePhoto} alt="" width={104} densities={[1]} />
+      </figure>
+
+      <div class="reveal">
+        <h2 class="text-3xl font-bold">Yannick Desiron</h2>
+        <p class="mt-2 text-lg" style="color: var(--muted)">
+          {t.profile.role}
+        </p>
+        <p class="mt-6 max-w-xl leading-relaxed" style="color: var(--muted)">
+          {t.profile.bio}
+        </p>
+
+        <dl class="profile-facts mt-10">
+          <div>
+            <dt>{t.profile.facts.role}</dt>
+            <dd>{t.profile.facts.roleValue}</dd>
+          </div>
+          <div>
+            <dt>{t.profile.facts.company}</dt>
+            <dd>CrediBill</dd>
+          </div>
+          <div>
+            <dt>{t.profile.facts.location}</dt>
+            <dd>{t.profile.facts.locationValue}</dd>
+          </div>
+          <div>
+            <dt>{t.profile.facts.stack}</dt>
+            <dd>PHP · TypeScript · MySQL</dd>
+          </div>
+          <div>
+            <dt>{t.profile.facts.background}</dt>
+            <dd>{t.profile.facts.backgroundValue}</dd>
+          </div>
+          <div>
+            <dt>{t.profile.facts.status}</dt>
+            <dd style="color: var(--accent)">{t.profile.facts.statusValue}</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
   <!-- ================= STORY / TIMELINE ================= -->
   <section id="story" class="band px-6 py-20">
     <div class="mx-auto max-w-5xl">
@@ -209,24 +235,38 @@ const marqueeTechs = [
         </figure>
 
         <ol class="timeline">
-          {experience.map((item) => (
-            <li class="timeline-item reveal" data-kind={item.kind}>
-              <span class="timeline-dot"></span>
-              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span class="section-label text-xs">{formatPeriod(lang, item.start, item.end)}</span>
-                <span class="tl-kind">
-                {item.kind === 'code' ? (
-                  <SkinIcon modern="lucide:code-xml" pixel="pixelarticons:code" />
+          {timeline.map((entry) => {
+            const kind = entry.group ? 'court' : entry.item.kind;
+            const start = entry.group ? entry.start : entry.item.start;
+            const end = entry.group ? entry.end : entry.item.end;
+            const role = entry.group ? entry.role : entry.item.role;
+            return (
+              <li class="timeline-item reveal" data-kind={kind}>
+                <span class="timeline-dot"></span>
+                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span class="section-label text-xs">{formatPeriod(lang, start, end)}</span>
+                  <span class="tl-kind">
+                    {kind === 'code' ? (
+                      <SkinIcon modern="lucide:code-xml" pixel="pixelarticons:code" />
+                    ) : (
+                      <SkinIcon modern="lucide:dribbble" pixel="pixelarticons:human-run" />
+                    )}
+                    {kind === 'code' ? t.story.kindCode : t.story.kindCourt}
+                  </span>
+                </div>
+                <h3 class="mt-1 text-lg font-bold">{t.story.roles[role]}</h3>
+                {entry.group ? (
+                  <ul class="tl-clubs mt-1.5">
+                    {entry.orgs.map((org) => (
+                      <li>{org}</li>
+                    ))}
+                  </ul>
                 ) : (
-                  <SkinIcon modern="lucide:dribbble" pixel="pixelarticons:human-run" />
+                  <p class="mt-0.5 font-semibold">{entry.item.org}</p>
                 )}
-                {item.kind === 'code' ? t.story.kindCode : t.story.kindCourt}
-              </span>
-              </div>
-              <h3 class="mt-1 text-lg font-bold">{t.story.roles[item.role]}</h3>
-              <p class="mt-0.5 font-semibold">{item.org}</p>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       </div>
     </div>

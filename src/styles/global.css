@@ -1090,6 +1090,26 @@ html.switching body::after {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
 }
+/* De clubs onder één samengevoegd tijdlijn-item: compact naast elkaar,
+   zodat veertien jaar niet als zes identieke regels leest. */
+.tl-clubs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-weight: 600;
+}
+/* Scheidingsteken achteraan, niet vooraan: bij het afbreken van een regel
+   begint die anders met een losse punt. */
+.tl-clubs li:not(:last-child)::after {
+  content: "·";
+  margin-left: 0.75rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
 .timeline-item[data-kind="court"] .tl-kind {
   color: var(--court);
   border-color: color-mix(in srgb, var(--court) 45%, transparent);
@@ -1329,6 +1349,19 @@ html.switching body::after {
   .profile {
     grid-template-columns: minmax(0, 340px) 1fr;
     gap: 3.5rem;
+  }
+}
+
+/* Onder het breekpunt vallen de foto's in één kolom en worden ze
+   paginavullend: op 740px breed werd het portret 1037px hoog, meer dan een
+   heel scherm. Boven 768px staan ze in een kolom van 340px en speelt dit
+   niet, vandaar de begrenzing alleen hier. */
+@media (max-width: 767px) {
+  .profile-photo img.modern-only,
+  .story-photo img.modern-only {
+    max-height: 56vh;
+    object-fit: cover;
+    object-position: center 22%;
   }
 }
 
