@@ -1170,6 +1170,16 @@ html.switching body::after {
 .bg-fx-dots { color: var(--dot); }
 .bg-fx-spot { color: var(--accent); }
 
+/* In de moderne skin draagt de hero-tekst het puntmotief; een pagina vol
+   dezelfde puntjes camoufleert die dan. Het verloop in de achtergrond geeft
+   genoeg diepte. In de pixel-skin blijft het raster: daar is het geen
+   versiering maar de grammatica van de stijl, en de blokletters botsen er
+   niet mee. De accentlaag en de rimpel houden hun punten, zodat het raster
+   verschijnt waar je wijst of klikt in plaats van er altijd te liggen. */
+:root[data-style="modern"] .bg-fx-dots {
+  display: none;
+}
+
 /* Welcome ripple: a ring of lit dots sweeping outward, driven from JS */
 .bg-fx-ripple {
   color: var(--accent);
