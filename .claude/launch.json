@@ -6,23 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run",
-        "dev"
-      ],
-      "port": 4321
-    },
-    {
-      "name": "portfolio-dev-4322",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
         "dev",
         "--",
         "--port",
-        "4322",
-        "--host",
-        "127.0.0.1"
+        "4323"
       ],
-      "port": 4322
+      "port": 4323
     }
   ]
 }
