@@ -321,12 +321,11 @@ img {
 }
 .skill-fill {
   height: 100%;
-  width: 0;
+  width: var(--level);
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
   transition: width 900ms var(--dribble);
 }
-.visible .skill-fill { width: var(--level); }
 :root[data-style="pixel"] .skill-track {
   height: 18px;
   border-radius: 0;
@@ -337,19 +336,6 @@ img {
   mask: repeating-linear-gradient(90deg, #000 0 12px, transparent 12px 16px);
 }
 
-/* ---- Scroll reveal ---- */
-.reveal {
-  opacity: 0;
-  transform: translateY(18px);
-  transition: opacity 600ms var(--ease), transform 600ms var(--dribble);
-}
-.reveal.visible {
-  opacity: 1;
-  transform: none;
-}
-:root[data-style="pixel"] .reveal {
-  transition-duration: 250ms;
-}
 
 /* ---- Command palette ---- */
 .cmdk-trigger {
@@ -1092,8 +1078,6 @@ html.switching body::after {
   position: relative;
 }
 .timeline-dot {
-  scale: 0;
-  transition: scale 420ms var(--dribble);
   position: absolute;
   left: calc(-1 * var(--tl-pad));
   top: 4px;
@@ -1103,10 +1087,6 @@ html.switching body::after {
   background: var(--accent);
   border: 3px solid var(--bg-soft);
   box-shadow: 0 0 0 2px var(--accent);
-}
-/* each marker pops in when its entry reveals */
-.timeline-item.visible .timeline-dot {
-  scale: 1;
 }
 .timeline-item[data-kind="court"] .timeline-dot {
   background: var(--court);
@@ -1222,6 +1202,14 @@ html.switching body::after {
 .bg-fx.is-live .bg-fx-spot,
 .bg-fx.is-live .bg-fx-halo {
   opacity: 1;
+}
+/* In de hero volgen twee lagen tegelijk de cursor: dit accentlicht en de
+   deeltjestekst. Ze concurreren, en de zwakste wint ruimte van de sterkste.
+   Zolang de hero in beeld is blijft het licht dus uit; het raster zelf
+   blijft staan. Faalt het script, dan gedraagt alles zich als voorheen. */
+html.hero-in-view .bg-fx.is-live .bg-fx-spot,
+html.hero-in-view .bg-fx.is-live .bg-fx-halo {
+  opacity: 0;
 }
 .bg-fx-spot {
   -webkit-mask-image: radial-gradient(
@@ -1630,52 +1618,15 @@ html.switching body::after {
 }
 :root[data-style="pixel"] .status-dot { border-radius: 0; }
 
-/* ---- Tech marquee ---- */
-.marquee {
-  overflow: hidden;
-  border-block: var(--border-w) solid var(--border);
-  padding: 0.9rem 0;
-  background: color-mix(in srgb, var(--surface) 45%, transparent);
-}
-.marquee-track {
-  display: flex;
-  width: max-content;
-  animation: marquee 32s linear infinite;
-}
-.marquee:hover .marquee-track { animation-play-state: paused; }
-@keyframes marquee {
-  to { transform: translateX(-50%); }
-}
-.marquee-item {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.marquee-item::after {
-  content: "◆";
-  margin: 0 1.8rem;
-  color: var(--accent);
-  opacity: 0.55;
-  font-size: 0.65em;
-  vertical-align: middle;
-}
-:root[data-style="pixel"] .marquee-item { font-size: 1.15rem; }
-:root[data-style="pixel"] .marquee-item::after { content: "■"; }
 
 /* ---- Reduced motion: kill the fun, keep the content ---- */
 @media (prefers-reduced-motion: reduce) {
   html.booting .boot { display: none; }
   .timeline::before { transform: none; }
-  .timeline-dot { scale: 1; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
   html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; }
-  .visible .skill-fill, .skill-fill { width: var(--level); }
 }

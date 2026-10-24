@@ -31,18 +31,6 @@ const skills = t.skills.items.map((name, i) => ({
   level: [92, 85, 88, 75, 80][i],
 }));
 
-const marqueeTechs = [
-  'PHP',
-  'TypeScript',
-  'MySQL',
-  'Docker',
-  'Astro',
-  'Tailwind',
-  'Node.js',
-  'REST APIs',
-  'Git',
-  'CI/CD',
-];
 
 ---
 
@@ -71,23 +59,16 @@ const marqueeTechs = [
     </div>
   </section>
 
-  <!-- ================= TECH MARQUEE ================= -->
-  <div class="marquee" aria-hidden="true">
-    <div class="marquee-track">
-      {[...marqueeTechs, ...marqueeTechs].map((tech) => <span class="marquee-item">{tech}</span>)}
-    </div>
-  </div>
-
   <!-- ================= PROJECTS ================= -->
   <section id="projects" class="mx-auto max-w-5xl px-6 py-20">
-    <p class="section-label reveal">{t.projects.label}</p>
-    <h2 class="reveal mt-2 text-3xl font-bold">
+    <p class="section-label">{t.projects.label}</p>
+    <h2 class="mt-2 text-3xl font-bold">
       <span class="modern-only">{t.projects.headingModern}</span>
       <span class="pixel-only">{t.projects.headingPixel}</span>
     </h2>
     <div class="mt-10 grid gap-6 md:grid-cols-3 md:grid-rows-2">
       <!-- Featured project: spans 2x2 in the bento grid -->
-      <article class="card card-hover reveal flex flex-col p-7 md:col-span-2 md:row-span-2">
+      <article class="card card-hover flex flex-col p-7 md:col-span-2 md:row-span-2">
         <span class="section-label text-xs">
           <span class="pixel-only">LVL </span>{projects[0].level} · {t.projects.featured}
         </span>
@@ -118,7 +99,7 @@ const marqueeTechs = [
       </article>
 
       {projects.slice(1).map((project) => (
-        <article class="card card-hover reveal flex flex-col p-6">
+        <article class="card card-hover flex flex-col p-6">
           <span class="section-label text-xs">
             <span class="pixel-only">LVL </span>{project.level}
           </span>
@@ -136,9 +117,9 @@ const marqueeTechs = [
 
   <!-- ================= PROFILE ================= -->
   <section id="profile" class="mx-auto max-w-5xl px-6 py-24">
-    <p class="section-label reveal">{t.profile.label}</p>
+    <p class="section-label">{t.profile.label}</p>
     <div class="profile mt-8">
-      <figure class="profile-photo reveal">
+      <figure class="profile-photo">
         <Image
           class="modern-only"
           src={profilePhoto}
@@ -150,7 +131,7 @@ const marqueeTechs = [
         <Image class="pixel-only" src={profilePhoto} alt="" width={104} densities={[1]} />
       </figure>
 
-      <div class="reveal">
+      <div>
         <h2 class="text-3xl font-bold">Yannick Desiron</h2>
         <p class="mt-2 text-lg" style="color: var(--muted)">
           {t.profile.role}
@@ -192,14 +173,14 @@ const marqueeTechs = [
   <!-- ================= STORY / TIMELINE ================= -->
   <section id="story" class="band px-6 py-20">
     <div class="mx-auto max-w-5xl">
-      <p class="section-label reveal">{t.story.label}</p>
-      <h2 class="reveal mt-2 text-3xl font-bold">{t.story.heading}</h2>
-      <p class="reveal mt-4 max-w-xl" style="color: var(--muted)">
+      <p class="section-label">{t.story.label}</p>
+      <h2 class="mt-2 text-3xl font-bold">{t.story.heading}</h2>
+      <p class="mt-4 max-w-xl" style="color: var(--muted)">
         {t.story.intro}
       </p>
 
       <div class="story-body">
-        <figure class="story-photo reveal">
+        <figure class="story-photo">
           <Image
             class="modern-only"
             src={courtPhoto}
@@ -217,7 +198,7 @@ const marqueeTechs = [
             const end = entry.group ? entry.end : entry.item.end;
             const role = entry.group ? entry.role : entry.item.role;
             return (
-              <li class="timeline-item reveal" data-kind={kind}>
+              <li class="timeline-item" data-kind={kind}>
                 <span class="timeline-dot"></span>
                 <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span class="section-label text-xs">{formatPeriod(lang, start, end)}</span>
@@ -250,14 +231,14 @@ const marqueeTechs = [
 
   <!-- ================= SKILLS ================= -->
   <section id="skills" class="mx-auto max-w-3xl px-6 py-20">
-    <p class="section-label reveal">{t.skills.label}</p>
-    <h2 class="reveal mt-2 text-3xl font-bold">
+    <p class="section-label">{t.skills.label}</p>
+    <h2 class="mt-2 text-3xl font-bold">
       <span class="modern-only">{t.skills.headingModern}</span>
       <span class="pixel-only">{t.skills.headingPixel}</span>
     </h2>
     <div class="mt-10 flex flex-col gap-6">
       {skills.map((skill) => (
-        <div class="reveal">
+        <div>
           <div class="mb-2 flex items-baseline justify-between">
             <span class="font-semibold">{skill.name}</span>
             <span class="text-sm" style="color: var(--muted); font-family: var(--font-mono)">
@@ -275,15 +256,15 @@ const marqueeTechs = [
   <!-- ================= CONTACT ================= -->
   <section id="contact" class="band px-6 py-24">
     <div class="mx-auto max-w-3xl text-center">
-      <p class="section-label reveal">{t.contact.label}</p>
-      <h2 class="reveal mt-2 text-3xl font-bold">
+      <p class="section-label">{t.contact.label}</p>
+      <h2 class="mt-2 text-3xl font-bold">
         <span class="modern-only">{t.contact.headingModern}</span>
         <span class="pixel-only">{t.contact.headingPixel}</span>
       </h2>
-      <p class="reveal mx-auto mt-4 max-w-md" style="color: var(--muted)">
+      <p class="mx-auto mt-4 max-w-md" style="color: var(--muted)">
         {t.contact.intro}
       </p>
-      <div class="reveal mt-8 flex flex-wrap justify-center gap-3">
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
         <a href="mailto:hello@example.com" class="btn btn-primary">
           <SkinIcon modern="lucide:mail" pixel="pixelarticons:mail" /> {t.contact.mail}
         </a>

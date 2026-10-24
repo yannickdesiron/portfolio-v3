@@ -432,19 +432,20 @@ const person = Astro.site && {
           requestAnimationFrame(step);
         }
 
-        // Scroll reveals
-        const observer = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
-                observer.unobserve(entry.target);
-              }
-            }
-          },
-          { threshold: 0.15 },
-        );
-        document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+        // Het accentlicht van de achtergrond uit zolang de hero in beeld is:
+        // daar volgt de deeltjestekst de cursor al, en twee lagen die
+        // hetzelfde doen verzwakken elkaar.
+        const hero = document.querySelector('.hero');
+        if (hero) {
+          const heroObserver = new IntersectionObserver(
+            ([entry]) => root.classList.toggle('hero-in-view', entry.isIntersecting),
+            { threshold: 0.2 },
+          );
+          heroObserver.observe(hero);
+          signal.addEventListener('abort', () => heroObserver.disconnect(), { once: true });
+        } else {
+          root.classList.remove('hero-in-view');
+        }
 
         // The timeline draws itself as you scroll past it
         const timeline = document.querySelector<HTMLElement>('.timeline');
@@ -469,7 +470,7 @@ const person = Astro.site && {
 
         const TEXT_PARTS =
           'main h2, main h3, main p, main li, main dt, main dd, main .chip, .section-label,' +
-          ' main .btn, .site-header nav a, .lang-switch, footer p, .marquee-item, .hero-lead';
+          ' main .btn, .site-header nav a, .lang-switch, footer p, .hero-lead';
         const WHOLE_BLOCKS = 'main figure, main .skill-track';
 
         /** Wraps every character in its own inline-block, words kept unbreakable. */
