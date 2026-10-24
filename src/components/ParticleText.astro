@@ -217,10 +217,13 @@ const { text } = Astro.props;
 
       // Dot size stays constant; only the grid spacing scales with the type,
       // so a bigger headline means more dots rather than bigger ones.
+      // De pixel-skin houdt grove blokjes — dat is daar het punt. De moderne
+      // skin gaat fijner: kleinere punten op een iets dichter raster, zodat de
+      // letters niet uitdunnen maar wel een fijnere korrel krijgen.
       const gap = isPixel
         ? Math.max(3.2, Math.min(7, fontSize * 0.078))
-        : Math.max(2.5, Math.min(4.2, fontSize * 0.034));
-      dotSize = isPixel ? 2.5 : 2.1;
+        : Math.max(2.1, Math.min(3.6, fontSize * 0.029));
+      dotSize = isPixel ? 2.5 : 1.5;
       radius = Math.max(70, fontSize * 1.5);
 
       // Same text, new canvas origin: shift the dots we already have. Sampling
